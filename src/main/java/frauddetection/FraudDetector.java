@@ -25,6 +25,8 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.util.Collector;
 import org.apache.flink.walkthrough.common.entity.Alert;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
@@ -39,6 +41,8 @@ public class FraudDetector extends KeyedProcessFunction<Long, MyTransaction, Ale
 	private transient ValueState<Boolean> flagState;
 	private transient ValueState<Long> timerState;
 
+	private static final Logger log = LoggerFactory.getLogger(FraudDetector.class);
+
 	@Override
 	public void open(Configuration parameters) {
 		ValueStateDescriptor<Boolean> flagDescriptor = new ValueStateDescriptor<>("flag", Types.BOOLEAN);
@@ -51,8 +55,12 @@ public class FraudDetector extends KeyedProcessFunction<Long, MyTransaction, Ale
 	@Override
 	public void processElement(MyTransaction transaction, Context context, Collector<Alert> collector) throws Exception {
 		Boolean lastTransactionWasSmall = flagState.value();
+		log.info("processing transaction :{}", transaction);
+
 		if (lastTransactionWasSmall != null) {
+			log.info("lastTransactionWasSmall is not null :{}", transaction);
 			if (transaction.getAmount() > LARGE_AMOUNT) {
+				log.info("find large transaction :{}", transaction);
 				Alert alert = new Alert();
 				alert.setId(transaction.getAccountId());
 				collector.collect(alert);
@@ -63,6 +71,7 @@ public class FraudDetector extends KeyedProcessFunction<Long, MyTransaction, Ale
 		}
 
 		if (transaction.getAmount() < SMALL_AMOUNT) {
+			log.info("find small transaction :{}", transaction);
 			flagState.update(true);
 
 			long timer = context.timerService().currentProcessingTime() + ONE_MINUTE;
